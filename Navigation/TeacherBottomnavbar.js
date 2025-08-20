@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 
-const BottomNavigation = ({ state, navigation }) => {
+const TeacherBottomnavbar = ({ state, navigation }) => {
     const tabs = [
         { id: 'Home', label: 'Home', icon: 'home' },
         { id: 'Timetable', label: 'Timetable', icon: 'event-note' },
@@ -15,6 +14,7 @@ const BottomNavigation = ({ state, navigation }) => {
         { id: 'Chat', label: 'Chat', icon: 'chat-bubble-outline' },
 
         { id: 'More', label: 'More', icon: 'more-vert' },
+        // { id: 'Attandace Tracker', label: 'Attandance', icon: 'more-vert' },
     ];
 
     return (
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.15,
         shadowRadius: 2,
         elevation: 3, // Remove this line
-        marginBottom : 16
+        marginBottom: 16
     },
     tabBar: {
         flexDirection: 'row',
@@ -112,4 +112,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default BottomNavigation;
+export default TeacherBottomnavbar;
