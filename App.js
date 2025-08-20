@@ -9,7 +9,6 @@ import { AuthProvider, useAuth } from './Context/authContext';
 // Teacher Screens
 import Dashboard from './screens/Teacher/HomeScreen';
 import ClassScreen from './screens/Teacher/ClassScreen';
-import Bottomnavbar from './Navigation/TeacherBottomnavbar';
 import TimetableScreen from './screens/Teacher/TimetableScreen';
 import ChatScreen from './screens/Teacher/ChatScreen';
 import SettingScreen from './screens/Teacher/SettingsScreen';
@@ -45,11 +44,11 @@ function TeacherTabs() {
   return (
     <Tab.Navigator
       tabBar={props => <TeacherBottomnavbar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: true }}
     >
       <Tab.Screen name="Home" component={Dashboard} />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
-      <Tab.Screen name="teaching" component={TeachingScreen} />
+      <Tab.Screen name="Teaching" component={TeachingScreen} />
       <Tab.Screen name="Chat" component={ChatScreen} />
       <Tab.Screen name="More" component={SettingScreen} />
       <Tab.Screen name="Attendance" component={AttendaceTracking} />
@@ -62,7 +61,7 @@ function ParentTabs() {
   return (
     <Tab.Navigator
       tabBar={props => <ParentBottomnavbar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: true }}
     >
       <Tab.Screen name="Home" component={ParentDashboard} />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
@@ -79,7 +78,7 @@ function StudentTabs() {
   return (
     <Tab.Navigator
       tabBar={props => <StudentBottomnavbar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: true }}
     >
       <Tab.Screen name="Home" component={StudentDashboard} />
       <Tab.Screen name="Timetable" component={TimetableScreen} />
@@ -106,7 +105,7 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: true }}>
         {!userRole ? (
           // Auth Stack - No user role (not logged in)
           <>
@@ -116,7 +115,7 @@ function AppNavigator() {
         ) : userRole === 'Teacher' ? (
           // Teacher Stack
           <>
-            <Stack.Screen name="MainTabs" component={TeacherTabs} />
+            <Stack.Screen name="MainTabs" component={TeacherTabs} options={{headerShown : false}}/>
             <Stack.Screen name="Class" component={ClassScreen} />
             <Stack.Screen name="My Class" component={MyClassScreen} />
             <Stack.Screen name="Exam" component={ExamScreen} />
