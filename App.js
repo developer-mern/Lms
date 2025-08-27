@@ -55,7 +55,115 @@ import StudentBottomnavbar from './Navigation/StudentBottomnavbar';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+<<<<<<< HEAD
 // Loading Screen
+=======
+// Teacher Tab Navigator
+function TeacherTabs() {
+  return (
+    <Tab.Navigator
+      tabBar={props => <TeacherBottomnavbar {...props} />}
+      screenOptions={{ headerShown: true }}
+    >
+      <Tab.Screen name="Home" component={Dashboard} />
+      <Tab.Screen name="Timetable" component={TimetableScreen} />
+      <Tab.Screen name="Teaching" component={TeachingScreen} />
+      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="More" component={SettingScreen} />
+      <Tab.Screen name="Attendance" component={AttendaceTracking} />
+    </Tab.Navigator>
+  );
+}
+
+// Parent Tab Navigator (You'll need to create ParentBottomnavbar and screens)
+function ParentTabs() {
+  return (
+    <Tab.Navigator
+      tabBar={props => <ParentBottomnavbar {...props} />}
+      screenOptions={{ headerShown: true }}
+    >
+      <Tab.Screen name="Home" component={ParentDashboard} />
+      <Tab.Screen name="Timetable" component={TimetableScreen} />
+      <Tab.Screen name="teaching" component={TeachingScreen} />
+      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="More" component={SettingScreen} />
+      <Tab.Screen name="Attendance" component={AttendaceTracking} />
+    </Tab.Navigator>
+  );
+}
+
+// Student Tab Navigator (You'll need to create StudentBottomnavbar and screens)
+function StudentTabs() {
+  return (
+    <Tab.Navigator
+      tabBar={props => <StudentBottomnavbar {...props} />}
+      screenOptions={{ headerShown: true }}
+    >
+      <Tab.Screen name="Home" component={StudentDashboard} />
+      <Tab.Screen name="Timetable" component={TimetableScreen} />
+      <Tab.Screen name="academic" component={TeachingScreen} />
+      <Tab.Screen name="Chat" component={ChatScreen} />
+      <Tab.Screen name="More" component={SettingScreen} />
+      <Tab.Screen name="Attendance" component={AttendaceTracking} />
+    </Tab.Navigator>
+  );
+}
+
+// Main App Navigator with Role-Based Routing
+function AppNavigator() {
+  const { userRole, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: true }}>
+        {!userRole ? (
+          // Auth Stack - No user role (not logged in)
+          <>
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Signup" component={SignupScreen} />
+          </>
+        ) : userRole === 'Teacher' ? (
+          // Teacher Stack
+          <>
+            <Stack.Screen name="MainTabs" component={TeacherTabs} options={{headerShown : false}}/>
+            <Stack.Screen name="Class" component={ClassScreen} />
+            <Stack.Screen name="My Class" component={MyClassScreen} />
+            <Stack.Screen name="Exam" component={ExamScreen} />
+            <Stack.Screen name="Lessons" component={LessonScreen} />
+            <Stack.Screen name="Lessons Detail" component={LessonDetailScreen} />
+            <Stack.Screen name="Report Screen" component={ReportScreen} />
+            <Stack.Screen name="Grade Screen" component={GradeScreen} />
+            <Stack.Screen name="Attendance Tracker" component={AttendaceTracking} />
+          </>
+        ) : userRole === 'Parent' ? (
+          // Parent Stack
+          <>
+            <Stack.Screen name="ParentTabs" component={ParentTabs} />
+            {/* Add parent-specific screens here */}
+          </>
+        ) : (
+          // Student Stack
+          <>
+            <Stack.Screen name="StudentTabs" component={StudentTabs} />
+            {/* Add student-specific screens here */}
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// Loading Component
+>>>>>>> 6b3b6aeff879c4ab78df396c1f965e7fa1665e63
 function LoadingScreen() {
   return (
     <View style={styles.loadingContainer}>
