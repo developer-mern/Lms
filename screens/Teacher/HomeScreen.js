@@ -1,24 +1,163 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, Dimensions, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAuth } from '../../Context/authContext';
+import { getEventsAndAssignments, getTeacherDashboard, getTeacherTimetable } from '../../api/authapi';
+import { useNavigation } from '@react-navigation/native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const Dashboard = () => {
-    const schedule = [
-        { subject: "Science", room: "Room 101", time: "08:30-09:30", status: "Ongoing", color: "#10B981", textColor: "#10B981" },
-        { subject: "Mathematics", room: "Room 101", time: "10:00-11:00", status: "Upcoming", color: "#3b82f6", textColor: "#3b82f6" },
-        { subject: "Physics", room: "Room 101", time: "13:00-14:00", status: "Upcoming", color: "#3b82f6", textColor: "#3b82f6" }
-    ];
+    const navigation = useNavigation();
 
-    const events = [
-        { date: '15', month: 'May', title: 'Science Fair', time: '10:00' },
-        { date: '20', month: 'May', title: 'Parent-teacher Meeting', time: '10:00' },
+    const { user, token } = useAuth();
+    const [events, setEvents] = useState([]);
+    const [assignments, setAssignments] = useState([]);
+    const [dashboardData, setDashboardData] = useState({
+        totalClasses: 0,
+        totalStudents: 0,
+        totalAssignments: 0,
+        totalSubjects: 0
+    });
+    const [schedule, setSchedule] = useState([]);
+
+    const formatTimeToAMPM = (timeString) => {
+        if (!timeString) return "Unknown";
+        const [hours, minutes] = timeString.split(":").map(Number);
+        const date = new Date();
+        date.setHours(hours);
+        date.setMinutes(minutes);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
+    };
+
+    useEffect(() => {
+        const fetchData = async () => {
+            const data = await getTeacherTimetable(token);
+
+            const today = new Date().toLocaleDateString("en-US", { weekday: "long" }); // e.g. "Saturday"
+
+            // Adjust mapping based on backend response
+            const formatted = data
+                .filter((item) => item.day === today) // only today's schedule
+                .map((item) => ({
+                    subject: item.subject || item.subjectName || "Unknown",
+                    room: item.room || item.classRoom || "Unknown",
+                    startTime: formatTimeToAMPM(item.startTime), // convert here
+                    endTime: formatTimeToAMPM(item.endTime),
+                    status: getStatus(item.startTime, item.endTime),
+                    color: "#3b82f6",
+                    textColor: "#10B981",
+                }));
+
+            setSchedule(formatted);
+        };
+
+        fetchData();
+    }, [token]);
+
+    // Helper functions
+    const formatTime = (isoString) => {
+        if (!isoString) return "";
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    };
+
+    const getStatus = (start, end) => {
+        const now = new Date();
+        const startTime = new Date(start);
+        const endTime = new Date(end);
+
+        if (now < startTime) return "Upcoming";
+        if (now > endTime) return "Completed";
+        return "Ongoing";
+    };
+    useEffect(() => {
+        if (token) {
+            fetchDashboard();
+            fetchEventsAndAssignments();
+        }
+    }, [token]);
+
+    const fetchDashboard = async () => {
+        const res = await getTeacherDashboard(token);
+        if (res.success && res.data) {
+            setDashboardData({
+                totalClasses: res.data.totalClasses,
+                totalStudents: res.data.totalStudents,
+                totalAssignments: res.data.totalAssignments,
+                totalSubjects: res.data.totalSubjects
+            });
+        }
+    };
+
+    const fetchEventsAndAssignments = async () => {
+        const res = await getEventsAndAssignments(token);
+
+        // Map events to UI format
+        const mappedEvents = (res.events || []).map(event => {
+            // Split "d/m/yyyy" into parts
+            const [day, month, year] = event.startDate.split('/').map(Number);
+
+            const start = new Date(year, month - 1, day);
+
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            return {
+                month: monthNames[start.getMonth()],
+                date: start.getDate(),
+                title: event.title,
+                time: event.startTime
+            };
+        });
+        const mappedAssignment = (res.assignments || []).map(assigment => {
+            // Split "d/m/yyyy" into parts
+            const [day, month, year] = assigment.startDate.split('/').map(Number);
+
+            const start = new Date(year, month - 1, day);
+
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+            return {
+                month: monthNames[start.getMonth()],
+                date: start.getDate(),
+                title: assigment.title,
+                description: assigment.description,
+                start: assigment.startTime,
+                end: assigment.endTime,
+            };
+        });
+        setEvents(mappedEvents);
+        setAssignments(mappedAssignment);
+    };
+
+    const cards = [
+        { number: dashboardData.totalClasses, label: 'My Classes' },
+        { number: dashboardData.totalStudents, label: 'Total Students' },
+        { number: dashboardData.totalSubjects, label: 'Subjects' },
+        { number: dashboardData.totalAssignments, label: 'Assignments' },
     ];
+    const handleCardPress = (label) => {
+        switch (label) {
+            case 'My Classes':
+                navigation.navigate('Class'); // Replace with your screen name
+                break;
+            case 'Total Students':
+                navigation.navigate('Student'); // Replace with your screen name
+                break;
+            case 'Assignments':
+                navigation.navigate('AssignmentsScreen'); // Replace with your screen name
+                break;
+            default:
+                break;
+        }
+    };
+
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}
             contentContainerStyle={{ paddingBottom: 30 }}>
+
             {/* Search bar */}
             <View style={styles.searchContainer}>
                 <Icon name="search" size={24} color="#999" />
@@ -26,22 +165,23 @@ const Dashboard = () => {
             </View>
 
             {/* Greeting and date */}
-            <Text style={styles.greeting}>Hello, Teacher</Text>
-            <Text style={styles.dateText}>Friday, August 8, 2025</Text>
+            <Text style={styles.greeting}>Hello, {user?.username || 'Teacher'}!</Text>
+            <Text style={styles.dateText}>{new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+            })}</Text>
 
             {/* Horizontal cards */}
             <FlatList
-                data={[
-                    { number: '05', label: 'My Classes' },
-                    { number: '92%', label: 'Total Students' },
-                    { number: '92%', label: 'Assignments' },
-                ]}
+                data={cards}
                 keyExtractor={(item, index) => index.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.cardsContainer}
                 renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.card}>
+                    <TouchableOpacity style={styles.card} onPress={() => handleCardPress(item.label)}>
                         <Text style={styles.cardNumber}>{item.number}</Text>
                         <View style={styles.cardLabelRow}>
                             <Text style={styles.cardLabel}>{item.label}</Text>
@@ -60,21 +200,32 @@ const Dashboard = () => {
                         <Icon name="chevron-right" size={16} color="#3b82f6" />
                     </TouchableOpacity>
                 </View>
-                {schedule.map((item, index) => (
-                    <View key={index} style={styles.card1}>
-                        <View style={styles.left}>
-                            <View style={[styles.colorBar, { backgroundColor: item.color }]} />
-                            <View>
-                                <Text style={styles.subject}>{item.subject}</Text>
-                                <Text style={styles.room}>{item.room}</Text>
+
+                {schedule.length > 0 ? (
+                    schedule.map((item, index) => (
+                        <View key={index} style={styles.card1}>
+                            <View style={styles.left}>
+                                <View
+                                    style={[styles.colorBar, { backgroundColor: item.color }]}
+                                />
+                                <View>
+                                    <Text style={styles.subject}>{item.subject}</Text>
+                                    <Text style={styles.room}>{item.room}</Text>
+                                </View>
+                            </View>
+                            <View style={styles.right}>
+                                <Text style={styles.time}>{item.startTime} - {item.endTime} </Text>
+                                <Text style={[styles.status, { color: item.textColor }]}>
+                                    {item.status}
+                                </Text>
                             </View>
                         </View>
-                        <View style={styles.right}>
-                            <Text style={styles.time}>{item.time}</Text>
-                            <Text style={[styles.status, { color: item.textColor }]}>{item.status}</Text>
-                        </View>
-                    </View>
-                ))}
+                    ))
+                ) : (
+                    <Text style={{ marginTop: 10, color: "#666" }}>
+                        No schedule for today
+                    </Text>
+                )}
             </View>
 
             {/* Upcoming Events */}
@@ -86,7 +237,7 @@ const Dashboard = () => {
                         <Icon name="chevron-right" size={16} color="#3b82f6" />
                     </TouchableOpacity>
                 </View>
-                {events.map((event, index) => (
+                {events.length > 0 ? events.map((event, index) => (
                     <View key={index} style={styles.eventCard}>
                         <View style={styles.dateBox}>
                             <Text style={styles.month}>{event.month}</Text>
@@ -97,23 +248,47 @@ const Dashboard = () => {
                             <Text style={styles.eventTime}>{event.time}</Text>
                         </View>
                     </View>
-                ))}
+                )) : (
+                    <Text style={{ textAlign: 'center', color: '#6b7280' }}>No Upcoming Events</Text>
+                )}
+
             </View>
 
             {/* Active Assignments */}
-            <View style={styles.section1}>
-                <Icon name="task-alt" size={28} color="#10B981" />
+            <View style={styles.section}>
 
-                <View style={styles.assignmentBox}>
-                    <Text style={styles.sectionTitle}>Active Assignments</Text>
+                <View >
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Active Assignment</Text>
+                        <TouchableOpacity style={styles.seeAllRow}>
+                            <Text style={styles.seeAll}>See all</Text>
+                            <Icon name="chevron-right" size={16} color="#3b82f6" />
+                        </TouchableOpacity>
+                    </View>
 
-                    <Text style={styles.assignmentText}>No Pending Assignments</Text>
+                    {assignments.length > 0 ? assignments.map((a, index) => (
+                        <View key={index} style={styles.eventCard}>
+                            <View style={styles.dateBox}>
+                                <Text style={styles.month}>{a.month}</Text>
+                                <Text style={styles.date}>{a.date}</Text>
+                            </View>
+                            <View style={styles.eventInfo}>
+                                <Text style={styles.eventTitle}>{a.title}</Text>
+                                <Text style={styles.eventTime}>{a.time}</Text>
+                            </View>
+                        </View>
+                    )) : (
+                        <Text style={{ textAlign: 'center', color: '#6b7280' }}>No Pending Assignments</Text>
+                    )}
                 </View>
             </View>
+
+
+
+
         </ScrollView>
     );
 };
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f9fafb', paddingTop: 40, paddingHorizontal: 16 },
     searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 12, height: 40, marginBottom: 8, borderColor: "#E5E7EB", borderWidth: 1 },

@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Dimensions, TextInput, } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, SafeAreaView, ActivityIndicator, ScrollView, Dimensions, TextInput, } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { PieChart } from 'react-native-svg-charts';
 import { BarChart, Grid, XAxis, YAxis } from "react-native-svg-charts";
@@ -8,43 +8,130 @@ import { Button, Menu } from 'react-native-paper';
 import { DatePickerModal } from 'react-native-paper-dates';
 import AttendanceTrendsChart from "../../Components/AttendanceTrendsChart";
 import StudentAttendanceTable from "../../Components/StuddentAttendaceTable";
-import { Picker } from "@react-native-picker/picker"
+import DropDownPicker from 'react-native-dropdown-picker';
+
 import MoreScreen from "./MoreScreen";
 import { Dropdown } from 'react-native-element-dropdown';
 import DetailsPopup from "../../Components/ClassDetails";
 import StudentsPopup from '../../Components/StudentList'
+import { useAuth } from '../../Context/authContext';
+import { getMyClassesApi, getMyTeacherClassesApi, getStudentsByClassApi, recordAttendanceApi } from "../../api/authapi";
 
 
 export default function ClassScreen() {
+    const { token } = useAuth();
     const [activeTopTab, setActiveTopTab] = useState("Class");
     const [activeSubTab, setActiveSubTab] = useState("Overview");
     const [selectedClass, setSelectedClass] = useState('All Classes');
+    const [selectedAttClass, setAttSelectedClass] = useState(null);
+    const [students, setStudents] = useState([]);
     const [selectedStudents, setSelectedStudents] = useState('All Students');
     const screenWidth = Dimensions.get('window').width - 32;
     const [range, setRange] = React.useState({ startDate: undefined, endDate: undefined });
     const [open, setOpen] = React.useState(false);
-    const [classMenuVisible, setClassMenuVisible] = useState(false);
-    const [studentMenuVisible, setStudentMenuVisible] = useState(false);
-    const subjects = ["Maths", "Science", "English", "History", "Art", "Physics"];
-
+    const [classes, setClasses] = useState([]);
+    const [classesTeacher, setTeacherClasses] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState("");
     // Date states
+    const [classOptions, setClassOptions] = useState([]);
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [studentAttendance, setStudentAttendance] = useState({});
     const [startDate, setStartDate] = useState(undefined);
     const [endDate, setEndDate] = useState(undefined);
     const [dateModalVisible, setDateModalVisible] = useState(false);
     const [dateType, setDateType] = useState(null); // "start" or "end"
     const [activePopup, setActivePopup] = useState(null);
+
+    const handleUpdateAttendance = async () => {
+        if (!selectedAttClass || !selectedDate) {
+            alert("Please select class and date");
+            return;
+        }
+
+        // Determine final status for each student
+        const records = students.map((s) => ({
+            studentId: s._id,
+            classId: selectedAttClass,
+            date: selectedDate,
+            status: studentAttendance[s._id] || studentAttendance.global || "PRESENT", // use global if individual not set
+        }));
+
+        try {
+            const res = await recordAttendanceApi(token, records);
+            alert("Attendance updated successfully!");
+        } catch (err) {
+            console.error(err);
+            alert("Failed to update attendance");
+        }
+    };
+
+    const formatClasses = (classesData) => {
+        return classesData.map((cls) => ({
+            label: cls.name,   // e.g., "III-A"
+            value: cls._id,    // e.g., "12"
+        }));
+    };
+
+    useEffect(() => {
+        if (selectedAttClass) {
+            getStudentsByClassApi(selectedAttClass, token)
+                .then((res) => setStudents(res))
+                .catch((err) => console.error(err));
+        } else {
+            setStudents([]);
+        }
+    }, [selectedAttClass]);
+
+    useEffect(() => {
+        fetchMyClasses(token);
+        fetchMyTeacherClasses(token)
+    }, [token]);
+
+    const fetchMyClasses = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const classesData = await getMyClassesApi(token);
+            setClasses(classesData);
+            setClassOptions(formatClasses(classesData));
+        } catch (err) {
+            setError("Failed to load classes");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchMyTeacherClasses = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const classesData = await getMyTeacherClassesApi(token);
+            setTeacherClasses(classesData);
+        } catch (err) {
+            setError("Failed to load classes");
+        } finally {
+            setLoading(false);
+        }
+    };
+    const filteredClasses = classesTeacher.filter((c) => {
+        const query = searchQuery.toLowerCase();
+        return (
+            c.name.toLowerCase().includes(query) ||
+            c.grade?.name?.toLowerCase().includes(query) ||
+            c.grade?.level?.toString().includes(query)
+        );
+    });
+
     const actions = [
-        { label: "Present", iconName: 'check', color: "green" },
-        { label: "Absent", iconName: 'close', color: "red" },
-        { label: "Late", iconName: 'schedule', color: "orange" },
-        { label: "Excused", iconName: 'error', color: "dodgerblue" },
-        { label: "Note", iconName: 'note', color: "#666666" },
+        { label: "Present", iconName: 'check', color: "green", value: "PRESENT" },
+        { label: "Absent", iconName: 'close', color: "red", value: "ABSENT" },
+        { label: "Late", iconName: 'schedule', color: "orange", value: "LATE" },
+        { label: "Excused", iconName: 'error', color: "dodgerblue", value: "EXCUSED" },
+        { label: "Note", iconName: 'note', color: "#666666", value: "NOTE" },
     ];
 
-    const classOptions = [
-        { label: 'Class 1', value: '1' },
-        { label: 'Class 2', value: '2' },
-    ];
     const studentOptions = [
         { label: 'Student 1', value: '1' },
         { label: 'Student 2', value: '2' },
@@ -88,9 +175,8 @@ export default function ClassScreen() {
             arc: { outerRadius: '100%', innerRadius: '60%' }
         }
     ];
-
-    const handleOpenPopup = (type) => {
-        setActivePopup(type);
+    const handleOpenPopup = (type, data) => {
+        setActivePopup({ type, data });
     };
 
     const values = data.map(item => item.value);
@@ -190,7 +276,91 @@ export default function ClassScreen() {
             </View>
         </View>
     );
+    // Render individual class card
+    const renderClassCard = (classItem) => (
+           
 
+        <View key={classItem._id} style={styles.card}>
+            <View style={styles.cardHeader}>
+                {/* Left side */}
+                <View style={styles.leftSection}>
+                    <Text style={styles.className}>{classItem.name}</Text>
+                    <View style={styles.roleTag}>
+                        <Text style={styles.roleText}>Class Teacher</Text>
+                    </View>
+                </View>
+
+                {/* Right side */}
+                <View style={styles.studentCount}>
+                    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                        <Mask
+                            id={`mask0_436_5764_${classItem._id}`}
+                            maskUnits="userSpaceOnUse"
+                            x={0}
+                            y={0}
+                            width={24}
+                            height={24}
+                        >
+                            <Rect width={24} height={24} fill="#D9D9D9" />
+                        </Mask>
+                        <G mask={`url(#mask0_436_5764_${classItem._id})`}>
+                            <Path
+                                d="M0 18V16.425C0 15.7083 0.366667 15.125 1.1 14.675C1.83333 14.225 2.8 14 4 14C4.21667 14 4.425 14.0042 4.625 14.0125C4.825 14.0208 5.01667 14.0417 5.2 14.075C4.96667 14.425 4.79167 14.7917 4.675 15.175C4.55833 15.5583 4.5 15.9583 4.5 16.375V18H0ZM6 18V16.375C6 15.8417 6.14583 15.3542 6.4375 14.9125C6.72917 14.4708 7.14167 14.0833 7.675 13.75C8.20833 13.4167 8.84583 13.1667 9.5875 13C10.3292 12.8333 11.1333 12.75 12 12.75C12.8833 12.75 13.6958 12.8333 14.4375 13C15.1792 13.1667 15.8167 13.4167 16.35 13.75C16.8833 14.0833 17.2917 14.4708 17.575 14.9125C17.8583 15.3542 18 15.8417 18 16.375V18H6ZM19.5 18V16.375C19.5 15.9417 19.4458 15.5333 19.3375 15.15C19.2292 14.7667 19.0667 14.4083 18.85 14.075C19.0333 14.0417 19.2208 14.0208 19.4125 14.0125C19.6042 14.0042 19.8 14 20 14C21.2 14 22.1667 14.2208 22.9 14.6625C23.6333 15.1042 24 15.6917 24 16.425V18H19.5ZM8.125 16H15.9C15.7333 15.6667 15.2708 15.375 14.5125 15.125C13.7542 14.875 12.9167 14.75 12 14.75C11.0833 14.75 10.2458 14.875 9.4875 15.125C8.72917 15.375 8.275 15.6667 8.125 16ZM4 13C3.45 13 2.97917 12.8042 2.5875 12.4125C2.19583 12.0208 2 11.55 2 11C2 10.4333 2.19583 9.95833 2.5875 9.575C2.97917 9.19167 3.45 9 4 9C4.56667 9 5.04167 9.19167 5.425 9.575C5.80833 9.95833 6 10.4333 6 11C6 11.55 5.80833 12.0208 5.425 12.4125C5.04167 12.8042 4.56667 13 4 13ZM20 13C19.45 13 18.9792 12.8042 18.5875 12.4125C18.1958 12.0208 18 11.55 18 11C18 10.4333 18.1958 9.95833 18.5875 9.575C18.9792 9.19167 19.45 9 20 9C20.5667 9 21.0417 9.19167 21.425 9.575C21.8083 9.95833 22 10.4333 22 11C22 11.55 21.8083 12.0208 21.425 12.4125C21.0417 12.8042 20.5667 13 20 13ZM12 12C11.1667 12 10.4583 11.7083 9.875 11.125C9.29167 10.5417 9 9.83333 9 9C9 8.15 9.29167 7.4375 9.875 6.8625C10.4583 6.2875 11.1667 6 12 6C12.85 6 13.5625 6.2875 14.1375 6.8625C14.7125 7.4375 15 8.15 15 9C15 9.83333 14.7125 10.5417 14.1375 11.125C13.5625 11.7083 12.85 12 12 12ZM12 10C12.2833 10 12.5208 9.90417 12.7125 9.7125C12.9042 9.52083 13 9.28333 13 9C13 8.71667 12.9042 8.47917 12.7125 8.2875C12.5208 8.09583 12.2833 8 12 8C11.7167 8 11.4792 8.09583 11.2875 8.2875C11.0958 8.47917 11 8.71667 11 9C11 9.28333 11.0958 9.52083 11.2875 9.7125C11.4792 9.90417 11.7167 10 12 10Z"
+                                fill="#4B5563"
+                            />
+                        </G>
+                    </Svg>
+                    <Text style={styles.countText}>{classItem.studentCount}</Text>
+                </View>
+            </View>
+
+            <View style={styles.gradeRow}>
+                <Text style={styles.gradeText}>Grade : {classItem.gradeName || 'Grade not specified'}</Text>
+            </View>
+
+            {/* Subjects */}
+            <View style={styles.subjectsRow}>
+                {classItem.subjects && classItem.subjects.length > 0 ? (
+                    classItem.subjects.map((subject, index) => (
+                        <View key={subject._id || subject.id || subject.name} style={styles.subjectTag}>
+                            <Text style={styles.subjectText}>{subject.name || subject}</Text>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={styles.noSubjectsText}>No subjects assigned</Text>
+                )}
+            </View>
+
+            {/* Buttons */}
+            <View style={styles.buttonRow}>
+                <TouchableOpacity
+                    style={styles.outlineButton}
+                    onPress={() => handleOpenPopup('details', classItem)}
+                >
+                    <MaterialIcons
+                        name="visibility"
+                        size={24}
+                        color="#3B82F6"
+                        style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.outlineButtonText}>View Details</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={styles.outlineButton}
+                    onPress={() => handleOpenPopup('students', classItem)}
+                >
+                    <MaterialIcons
+                        name="groups"
+                        size={24}
+                        color="#3B82F6"
+                        style={{ marginRight: 6 }}
+                    />
+                    <Text style={styles.outlineButtonText}>View Students</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
     const topTabs = ["Class", "Student", "Attendance"];
 
     // Different subtabs for each top tab
@@ -332,14 +502,12 @@ export default function ClassScreen() {
                                 <ScrollView
                                     showsVerticalScrollIndicator={false}
                                 >
-
                                     {/* Subheading */}
                                     <View style={styles.container1}>
                                         <MaterialIcons
                                             name="school"
                                             size={24}
                                             color="#666666"
-
                                             style={styles.icon1}
                                         />
                                         <View>
@@ -362,107 +530,67 @@ export default function ClassScreen() {
                                             placeholder="Search classes"
                                             placeholderTextColor="#9CA3AF"
                                             style={styles.searchInput}
+                                            value={searchQuery}
+                                            onChangeText={setSearchQuery} // 🔹 updates search
                                         />
                                     </View>
 
-                                    {/* Class Card */}
-                                    <View style={styles.card}>
-                                        <View style={styles.cardHeader}>
-                                            {/* Left side */}
-                                            <View style={styles.leftSection}>
-                                                <Text style={styles.className}>X-A</Text>
-                                                <View style={styles.roleTag}>
-                                                    <Text style={styles.roleText}>Class Teacher</Text>
-                                                </View>
-                                            </View>
-
-                                            {/* Right side */}
-                                            <View style={styles.studentCount}>
-                                                <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                                                    <Mask
-                                                        id="mask0_436_5764"
-                                                        maskUnits="userSpaceOnUse"
-                                                        x={0}
-                                                        y={0}
-                                                        width={24}
-                                                        height={24}
-                                                    >
-                                                        <Rect width={24} height={24} fill="#D9D9D9" />
-                                                    </Mask>
-                                                    <G mask="url(#mask0_436_5764)">
-                                                        <Path
-                                                            d="M0 18V16.425C0 15.7083 0.366667 15.125 1.1 14.675C1.83333 14.225 2.8 14 4 14C4.21667 14 4.425 14.0042 4.625 14.0125C4.825 14.0208 5.01667 14.0417 5.2 14.075C4.96667 14.425 4.79167 14.7917 4.675 15.175C4.55833 15.5583 4.5 15.9583 4.5 16.375V18H0ZM6 18V16.375C6 15.8417 6.14583 15.3542 6.4375 14.9125C6.72917 14.4708 7.14167 14.0833 7.675 13.75C8.20833 13.4167 8.84583 13.1667 9.5875 13C10.3292 12.8333 11.1333 12.75 12 12.75C12.8833 12.75 13.6958 12.8333 14.4375 13C15.1792 13.1667 15.8167 13.4167 16.35 13.75C16.8833 14.0833 17.2917 14.4708 17.575 14.9125C17.8583 15.3542 18 15.8417 18 16.375V18H6ZM19.5 18V16.375C19.5 15.9417 19.4458 15.5333 19.3375 15.15C19.2292 14.7667 19.0667 14.4083 18.85 14.075C19.0333 14.0417 19.2208 14.0208 19.4125 14.0125C19.6042 14.0042 19.8 14 20 14C21.2 14 22.1667 14.2208 22.9 14.6625C23.6333 15.1042 24 15.6917 24 16.425V18H19.5ZM8.125 16H15.9C15.7333 15.6667 15.2708 15.375 14.5125 15.125C13.7542 14.875 12.9167 14.75 12 14.75C11.0833 14.75 10.2458 14.875 9.4875 15.125C8.72917 15.375 8.275 15.6667 8.125 16ZM4 13C3.45 13 2.97917 12.8042 2.5875 12.4125C2.19583 12.0208 2 11.55 2 11C2 10.4333 2.19583 9.95833 2.5875 9.575C2.97917 9.19167 3.45 9 4 9C4.56667 9 5.04167 9.19167 5.425 9.575C5.80833 9.95833 6 10.4333 6 11C6 11.55 5.80833 12.0208 5.425 12.4125C5.04167 12.8042 4.56667 13 4 13ZM20 13C19.45 13 18.9792 12.8042 18.5875 12.4125C18.1958 12.0208 18 11.55 18 11C18 10.4333 18.1958 9.95833 18.5875 9.575C18.9792 9.19167 19.45 9 20 9C20.5667 9 21.0417 9.19167 21.425 9.575C21.8083 9.95833 22 10.4333 22 11C22 11.55 21.8083 12.0208 21.425 12.4125C21.0417 12.8042 20.5667 13 20 13ZM12 12C11.1667 12 10.4583 11.7083 9.875 11.125C9.29167 10.5417 9 9.83333 9 9C9 8.15 9.29167 7.4375 9.875 6.8625C10.4583 6.2875 11.1667 6 12 6C12.85 6 13.5625 6.2875 14.1375 6.8625C14.7125 7.4375 15 8.15 15 9C15 9.83333 14.7125 10.5417 14.1375 11.125C13.5625 11.7083 12.85 12 12 12ZM12 10C12.2833 10 12.5208 9.90417 12.7125 9.7125C12.9042 9.52083 13 9.28333 13 9C13 8.71667 12.9042 8.47917 12.7125 8.2875C12.5208 8.09583 12.2833 8 12 8C11.7167 8 11.4792 8.09583 11.2875 8.2875C11.0958 8.47917 11 8.71667 11 9C11 9.28333 11.0958 9.52083 11.2875 9.7125C11.4792 9.90417 11.7167 10 12 10Z"
-                                                            fill="#4B5563"
-                                                        />
-                                                    </G>
-                                                </Svg>
-                                                <Text style={styles.countText}>40</Text>
-                                            </View>
+                                    {/* Loading State */}
+                                    {loading && (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator size="large" color="#3B82F6" />
+                                            <Text style={styles.loadingText}>Loading classes...</Text>
                                         </View>
+                                    )}
 
-                                        <View style={styles.gradeRow}>
-                                            <Text style={styles.gradeText}>Grade II</Text>
-                                        </View>
-
-                                        {/* Subjects */}
-                                        <View style={styles.subjectsRow}>
-                                            {subjects.map((sub, index) => (
-                                                <View key={index} style={styles.subjectTag}>
-                                                    <Text style={styles.subjectText}>{sub}</Text>
-                                                </View>
-                                            ))}
-                                        </View>
-
-                                        {/* Buttons */}
-                                        <View style={styles.buttonRow}>
+                                    {/* Error State */}
+                                    {error && (
+                                        <View style={styles.errorContainer}>
+                                            <MaterialIcons name="error" size={48} color="#F44336" />
+                                            <Text style={styles.errorText}>{error}</Text>
                                             <TouchableOpacity
-                                                style={styles.outlineButton}
-                                                onPress={() => handleOpenPopup('details')}
+                                                style={styles.retryButton}
+                                                onPress={fetchMyClasses}
                                             >
-                                                <MaterialIcons
-                                                    name="visibility"
-                                                    size={24}
-                                                    color="#3B82F6"
-                                                    style={{ marginRight: 6 }}
-                                                />
-                                                <Text style={styles.outlineButtonText}>View Details</Text>
-                                            </TouchableOpacity>
-
-                                            <TouchableOpacity
-                                                style={styles.outlineButton}
-                                                onPress={() => handleOpenPopup('students')}
-                                            >
-                                                <MaterialIcons
-                                                    name="groups"
-                                                    size={24}
-                                                    color="#3B82F6"
-                                                    style={{ marginRight: 6 }}
-                                                />
-                                                <Text style={styles.outlineButtonText}>View Students</Text>
+                                                <Text style={styles.retryButtonText}>Retry</Text>
                                             </TouchableOpacity>
                                         </View>
-                                    </View>
+                                    )}
+
+                                    {/* Classes List */}
+                                    {!loading && !error && filteredClasses.length === 0 && (
+                                        <View style={styles.emptyContainer}>
+                                            <MaterialIcons name="school" size={64} color="#9CA3AF" />
+                                            <Text style={styles.emptyText}>No classes found</Text>
+                                            <Text style={styles.emptySubText}>
+                                                {searchQuery
+                                                    ? "No classes match your search."
+                                                    : "You haven't been assigned to any classes yet."}
+                                            </Text>
+                                        </View>
+                                    )}
+
+
+                                    {/* Render Class Cards from API */}
+
+                                    {!loading &&
+                                        !error &&
+                                        filteredClasses.map((classItem) => renderClassCard(classItem))}
                                 </ScrollView>
                             </SafeAreaView>
-                            <DetailsPopup
-                                visible={activePopup === 'details'}
-                                onClose={() => setActivePopup(null)}
-                                classData={{
-                                    className: 'X-A',
-                                    grade: 'Grade II',
-                                    subjects: ['Math', 'Science', 'English'],
-                                    studentCount: 40
-                                }}
-                            />
 
-                            <StudentsPopup
-                                visible={activePopup === 'students'}
+                            {/* Popups */}
+                            <DetailsPopup
+                                visible={activePopup?.type === 'details'}
                                 onClose={() => setActivePopup(null)}
-                                students={[
-                                    { id: '0123', name: 'Student 1' },
-                                    { id: '0124', name: 'Student 2' },
-                                    // ... more students
-                                ]}
+                                classData={activePopup?.data || null}
+                            />
+                            <StudentsPopup
+                                visible={activePopup?.type === 'students'}
+                                onClose={() => setActivePopup(null)}
+                                students={activePopup?.data?.students || []}
+                                className={activePopup?.data?.name}
+                                studentCount={activePopup?.data?.studentCount}
                             />
                         </View>
                     }
@@ -488,96 +616,168 @@ export default function ClassScreen() {
                         </View>
                     } */}
 
-                    {/* Attendance Tab Content */}
-                    {activeTopTab === 'Attendance' && activeSubTab === 'Attendance' &&
-                        <ScrollView >
-                            <View style={styles.AttandaceContainer}>
-                                {/* Search Bar */}
-                                <View style={styles.searchBar}>
-                                    <MaterialIcons
-                                        name="search"
-                                        size={20}
-                                        color="#888"
-                                        style={{ marginRight: 8 }}
-                                    />
-                                    <TextInput placeholder="Search" style={{ flex: 1 }} />
-                                </View>
-                                {/* Take Attendance Card */}
-                                <View style={styles.card}>
-                                    <Text style={styles.cardTitle}>Take Attendance</Text>
-                                    <Text style={styles.cardSubtitle}>
-                                        Select a class and date to record attendance
-                                    </Text>
-
-                                    <Text style={styles.label}>Class</Text>
-                                    <View style={styles.Analysisdropdown}>
-                                        <Picker>
-                                            <Picker.Item label="10th A" value="10A" />
-                                            <Picker.Item label="10th B" value="10B" />
-                                            <Picker.Item label="10th C" value="10C" />
-                                        </Picker>
+                    {activeTopTab === 'Attendance' && activeSubTab === 'Attendance' && (
+                        <FlatList
+                            data={students} // your student array from API
+                            keyExtractor={(item) => item._id}
+                            ListHeaderComponent={() => (
+                                <View style={styles.AttandaceContainer}>
+                                    {/* Search Bar */}
+                                    <View style={styles.searchBar}>
+                                        <MaterialIcons name="search" size={20} color="#888" style={{ marginRight: 8 }} />
+                                        <TextInput placeholder="Search" style={{ flex: 1 }} />
                                     </View>
 
-                                    <TouchableOpacity style={styles.updateButton}>
-                                        <Text style={styles.updateButtonText}>Update Attendance</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                {/* Students Header */}
-                                <Text style={styles.heading}>Students</Text>
-                                <Text style={styles.date}>Friday , August 1st,2025</Text>
-                                {/* Add icons */}
-                                <View style={styles.addIcons}>
-                                    {Array(5)
-                                        .fill(0)
-                                        .map((_, i) => (
-                                            <TouchableOpacity key={i} style={styles.addBtn}>
-                                                <MaterialIcons name="add" size={22} color="#555" />
+                                    {/* Take Attendance Card */}
+                                    <View style={styles.card}>
+                                        <Text style={styles.cardTitle}>Take Attendance</Text>
+                                        <Text style={styles.cardSubtitle}>
+                                            Select a class and date to record attendance
+                                        </Text>
+
+                                        <Text style={styles.label}>Class</Text>
+                                        <View style={styles.Analysisdropdown}>
+                                            <DropDownPicker
+                                                open={open}
+                                                value={selectedAttClass}
+                                                items={classOptions}
+                                                setOpen={setOpen}
+                                                setValue={setAttSelectedClass}
+                                                setItems={setClassOptions}
+                                                placeholder="Select Class"
+                                            />
+                                        </View>
+
+                                        <View style={{ width: '48%', marginBottom: 22 }}>
+                                            <Text style={styles.label}>Date</Text>
+                                            <TouchableOpacity
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    borderWidth: 1,
+                                                    borderColor: '#ccc',
+                                                    padding: 10,
+                                                    borderRadius: 8,
+                                                }}
+                                                onPress={() => setDateModalVisible(true)}
+                                            >
+                                                <Text style={{ color: selectedDate ? '#000' : '#888' }}>
+                                                    {selectedDate ? selectedDate.toLocaleDateString() : 'Select Date'}
+                                                </Text>
+                                                <MaterialIcons name="calendar-today" size={22} color="#555" />
+                                            </TouchableOpacity>
+
+                                            {/* DatePickerModal */}
+                                            <DatePickerModal
+                                                locale="en-GB"
+                                                mode="single"
+                                                visible={dateModalVisible}
+                                                onDismiss={() => setDateModalVisible(false)}
+                                                date={selectedDate}
+                                                onConfirm={(dateObject) => {
+                                                    if (dateObject?.date) {
+                                                        const utcDate = new Date(dateObject.date);
+                                                        const localDate = new Date(
+                                                            utcDate.getTime() - utcDate.getTimezoneOffset() * 60000
+                                                        );
+                                                        setSelectedDate(localDate);
+                                                    }
+                                                    setDateModalVisible(false);
+                                                }}
+                                            />
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={styles.updateButton}
+                                            onPress={handleUpdateAttendance} // call API
+                                        >
+                                            <Text style={styles.updateButtonText}>Update Attendance</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* Students Header */}
+                                    <Text style={styles.heading}>Students</Text>
+                                    <Text style={styles.date}>
+                                        {new Date().toLocaleDateString('en-US', {
+                                            weekday: 'long',
+                                            month: 'long',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                    </Text>
+
+                                    {/* Global Add Icons (optional, no student reference) */}
+                                    <View style={styles.actionsRow1}>
+                                        {actions.map((action, i) => (
+                                            <TouchableOpacity
+                                                key={i}
+                                                style={[styles.actionBtn, { backgroundColor: studentAttendance.global === action.value ? action.color + "33" : "#fff" }]}
+                                                onPress={() => {
+                                                    // Set all students to this action
+                                                    const updatedAttendance = {};
+                                                    students.forEach(student => {
+                                                        updatedAttendance[student._id] = action.value;
+                                                    });
+
+                                                    setStudentAttendance(updatedAttendance);
+
+                                                    // Optional: mark which global action is active
+                                                    setStudentAttendance(prev => ({ ...updatedAttendance, global: action.value }));
+                                                }}
+                                            >
+                                                <MaterialIcons name={action.iconName} size={22} color={action.color} />
+                                                <Text style={[styles.actionLabel, { color: action.color }]}>{action.label}</Text>
                                             </TouchableOpacity>
                                         ))}
+                                    </View>
+
+
+                                    {/* Table Header */}
+                                    <View style={styles.headerRow}>
+                                        <Text style={styles.headerText}>Roll No</Text>
+                                        <Text style={styles.headerText}>Student name</Text>
+                                    </View>
+                                    <View style={styles.line} />
                                 </View>
-                                {/* Header */}
-                                <View style={styles.headerRow}>
-                                    <Text style={styles.headerText}>Roll No</Text>
-                                    <Text style={styles.headerText}>Student name</Text>
+                            )}
+                            renderItem={({ item }) => (
+                                <View>
+                                    <View style={styles.headerRow}>
+                                        <Text style={styles.headerText2}>{item.rollNo}</Text>
+                                        <Text style={styles.headerText1}>{item.name}</Text>
+                                    </View>
+
+                                    {/* Actions per student */}
+                                    <View style={styles.actionsRow}>
+                                        {actions.map((action, idx) => (
+                                            <TouchableOpacity
+                                                key={idx}
+                                                style={[
+                                                    styles.actionBtn,
+                                                    studentAttendance[item._id] === action.value && { backgroundColor: action.color + "33" }
+                                                ]}
+                                                onPress={() => {
+                                                    setStudentAttendance((prev) => ({
+                                                        ...prev,
+                                                        [item._id]: action.value
+                                                    }));
+                                                }}
+                                            >
+                                                <MaterialIcons name={action.iconName} size={22} color={action.color} />
+                                                <Text style={[styles.actionLabel, { color: action.color }]}>{action.label}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+
+                                    <View style={styles.line} />
                                 </View>
-                                <View style={styles.line} />
-                                {Array(4)
-                                    .fill(0)
-                                    .map((_, index) => (
-                                        <View key={index}>
-                                            {/* Header Row */}
-                                            <View style={styles.headerRow}>
-                                                <Text style={styles.headerText1}>012</Text>
-                                                <Text style={styles.headerText1}>Rugved Sharma</Text>
-                                            </View>
+                            )}
+                        />
+                    )}
 
-                                            {/* Add Icons */}
-                                            <View style={styles.actionsRow}>
-                                                {actions.map((action, idx) => (
-                                                    <TouchableOpacity key={idx} style={styles.actionBtn}>
-                                                        {/* Icon always light gray */}
-                                                        <MaterialIcons name={action.iconName} size={22} color={action.color} />
 
-                                                        {/* Text keeps original color */}
-                                                        <Text
-                                                            style={[
-                                                                styles.actionLabel,
-                                                                { color: action.color },
-                                                            ]}
-                                                        >
-                                                            {action.label}
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                ))}
-                                            </View>
 
-                                            {/* Line */}
-                                            <View style={styles.line} />
-                                        </View>
-                                    ))}
-                            </View>
-                        </ScrollView>
-                    }
                     {activeTopTab === 'Attendance' && activeSubTab === 'Attendance Analytics' &&
                         <ScrollView>
                             <View style={styles.Attendancecontainer}>
@@ -688,6 +888,9 @@ export default function ClassScreen() {
         </View >
     );
 }
+
+
+
 
 const styles = StyleSheet.create({
     mainContainer: {
@@ -1196,15 +1399,9 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     Analysisdropdown: {
-        borderWidth: 1,
-        borderColor: "#ccc",
-        borderRadius: 8,
-        paddingHorizontal: 10,
-        paddingVertical: 16,
-        width: 160,
-        height: 46,
-        justifyContent: "center",
+        width: 160,             // keep width if needed
         marginBottom: 16,
+        zIndex: 1000,
     },
     updateButton: {
         backgroundColor: "#2563EB",
@@ -1253,7 +1450,13 @@ const styles = StyleSheet.create({
     },
     headerText1: {
         fontSize: 16,
-        marginRight: 55,
+        marginLeft: 55,
+        fontWeight: "600",
+        color: "#111827",
+    },
+    headerText2: {
+        fontSize: 16,
+        marginLeft: 25,
         fontWeight: "600",
         color: "#111827",
     },
@@ -1266,6 +1469,12 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         paddingHorizontal: 22
+    },
+    actionsRow1: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 22,
+        marginBottom: 17
     },
     actionBtn: {
         backgroundColor: "#fff",
@@ -1302,4 +1511,23 @@ const styles = StyleSheet.create({
         maxWidth: 300,
         fontWeight: '400',
     },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 20,
+    },
+    emptyText: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#374151",
+        marginTop: 12,
+    },
+    emptySubText: {
+        fontSize: 14,
+        color: "#6B7280",
+        marginTop: 4,
+        textAlign: "center",
+    },
+
 });

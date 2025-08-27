@@ -4,22 +4,74 @@ import {
     Text,
     Image,
     TouchableOpacity,
-    ScrollView
+    ScrollView,
+    Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useAuth } from "../../Context/authContext"; // assuming you have auth context
+import { togglePublishVideoLessonAPI, deleteVideoLessonAPI } from "../../api/authapi"; // API functions
 
-export default function LessonDetailScreen({ navigation, route }) {
-    const [isPublished, setIsPublished] = useState(true);
+export default function TeacherLessonDetailScreen({ navigation, route }) {
+    const { token } = useAuth();
     const {
         lessonId,
         lessonTitle,
         subject,
         date,
-        description
+        description,
+        videoUrl,
+        thumbnailUrl,
+        duration,
+        views,
+        isPublished: initialPublished
     } = route.params;
 
+    const [isPublished, setIsPublished] = useState(initialPublished);
+    const [loading, setLoading] = useState(false);
+
+    // Handle publish/unpublish
+    const handleTogglePublish = async () => {
+        setLoading(true);
+        try {
+            const res = await togglePublishVideoLessonAPI(token, lessonId, !isPublished);
+            setIsPublished(res.lesson.isPublished);
+        } catch (err) {
+            Alert.alert("Error", "Failed to update publish status");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle delete
+    const handleDeleteLesson = async () => {
+        Alert.alert(
+            "Delete Lesson",
+            "Are you sure you want to delete this lesson?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        setLoading(true);
+                        try {
+                            await deleteVideoLessonAPI(token, lessonId);
+                            Alert.alert("Deleted", "Lesson deleted successfully");
+                            navigation.goBack();
+                        } catch (err) {
+                            Alert.alert("Error", "Failed to delete lesson");
+                            console.error(err);
+                        } finally {
+                            setLoading(false);
+                        }
+                    }
+                }
+            ]
+        );
+    };
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: "#f2f4f6" }}>
@@ -39,7 +91,7 @@ export default function LessonDetailScreen({ navigation, route }) {
                     marginTop: -5
                 }}>
                     <Text style={{ color: "#6B7280", fontSize: 14 }}>
-                        {subject} (10th)
+                        {subject}
                     </Text>
                     <Text style={{ color: "#6B7280", fontSize: 14 }}>
                         {isPublished ? "Published" : "Unpublished"}
@@ -48,7 +100,7 @@ export default function LessonDetailScreen({ navigation, route }) {
 
                 {/* Image */}
                 <Image
-                    source={require("../assets/Krishna.jpg")}
+                    source={{ uri: thumbnailUrl }}
                     style={{
                         width: "100%",
                         height: 210,
@@ -67,24 +119,18 @@ export default function LessonDetailScreen({ navigation, route }) {
                 }}>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <MaterialIcons name="access-time" color="#6B7280" size={20} />
-                        <Text style={{ color: "#6B7280", marginLeft: 4, fontSize: 14 }}>37 min</Text>
+                        <Text style={{ color: "#6B7280", marginLeft: 4, fontSize: 14 }}>{duration} min</Text>
                     </View>
 
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <MaterialCommunityIcons name="eye-outline" size={20} color="#6B7280" />
-                        <Text style={{ color: "#6B7280", marginLeft: 4, fontSize: 14 }}>23 views</Text>
+                        <Text style={{ color: "#6B7280", marginLeft: 4, fontSize: 14 }}>{views} views</Text>
                     </View>
 
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <MaterialIcons name="calendar-month" color="#6B7280" size={20} />
                         <Text style={{ color: "#6B7280", marginLeft: 4, fontSize: 14 }}>{date} 2025</Text>
                     </View>
-                </View>
-
-                {/* Teacher */}
-                <View style={{ marginTop: 18 }}>
-                    <Text style={{ color: "#6B7280", fontWeight: "600", fontSize: 12 }}>Teacher Name</Text>
-                    <Text style={{ color: "#111827", fontSize: 16 }}>Teacher name</Text>
                 </View>
 
                 {/* Description */}
@@ -114,7 +160,8 @@ export default function LessonDetailScreen({ navigation, route }) {
                             justifyContent: "center",
                             flexDirection: "row",
                         }}
-                        onPress={() => setIsPublished(!isPublished)}
+                        onPress={handleTogglePublish}
+                        disabled={loading}
                     >
                         {isPublished ? (
                             <MaterialCommunityIcons
@@ -149,6 +196,8 @@ export default function LessonDetailScreen({ navigation, route }) {
                             justifyContent: "center",
                             flexDirection: "row",
                         }}
+                        onPress={handleDeleteLesson}
+                        disabled={loading}
                     >
                         <MaterialIcons
                             name="delete-outline"

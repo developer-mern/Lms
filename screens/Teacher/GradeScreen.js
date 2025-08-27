@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -7,21 +7,55 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Dimensions,
+  Dimensions, ActivityIndicator
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Path } from "react-native-svg";
 import { KeyboardAvoidingView, Platform } from 'react-native';
+import { useAuth } from "../../Context/authContext"; // if you store token
+import { getStudentsByGrade, teachersaveExamGrades } from "../../api/authapi";
 
 
-export default function GradeScreen() {
+export default function GradeScreen({ route, navigation }) {
+  const { token } = useAuth();
+  const { examData } = route.params;
   const [searchQuery, setSearchQuery] = useState("");
-  const [allStudents, setAllStudents] = useState([
-    { id: 1, rollNo: "10", name: "Pranav Bhujbal", present: true, marks: "" },
-    { id: 2, rollNo: "11", name: "Aarav Sharma", present: false, marks: "" },
-    { id: 3, rollNo: "12", name: "Riya Verma", present: false, marks: "" },
-  ]);
+  const [allStudents, setAllStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  const saveGrades = async () => {
+    try {
+      const res = await teachersaveExamGrades(examData.id, allStudents, token);
+
+      if (res.success) {
+        alert("Grades saved successfully!");
+      } else {
+        alert("Failed to save grades.");
+      }
+    } catch (err) {
+      console.error("🔥 Error saving grades:", err);
+      alert("Failed to save grades.");
+    }
+  };
+
+  useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        // examData.gradeId should contain the grade ID
+        const data = await getStudentsByGrade(examData.id, token);
+        setAllStudents(data.students);
+      } catch (err) {
+        console.error("Error fetching students:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStudents();
+  }, [examData.gradeId]);
+
+  if (loading) return <ActivityIndicator size="large" color="#0000ff" />;
   // Filter students based on search query
   const filteredStudents = allStudents.filter(student => {
     const query = searchQuery.toLowerCase();
@@ -57,6 +91,11 @@ export default function GradeScreen() {
       prev.map((s) => (s.id === id ? { ...s, present: !s.present } : s))
     );
   };
+const updateRemark = (id, value) => {
+  setAllStudents((prev) =>
+    prev.map((s) => (s.id === id ? { ...s, remark: value } : s))
+  );
+};
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -68,19 +107,19 @@ export default function GradeScreen() {
 
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.examTitle}>Final Exam</Text>
+              <Text style={styles.examTitle}>{examData.title}</Text>
               <View style={styles.statusBadge}>
-                <Text style={styles.statusText}>Completed</Text>
+                <Text style={styles.statusText}>{examData.status}</Text>
               </View>
             </View>
 
             <View style={styles.subTextContainer}>
-              <Text style={styles.linkText}>Science</Text>
-              <Text style={styles.normalText}>(10th A) </Text>
+              <Text style={styles.linkText}>{examData.subject}</Text>
+              <Text style={styles.normalText}>{examData.grade} </Text>
               <View style={{ flex: 1 }} />
               <Text style={styles.accessText}>
                 <Text style={styles.accessLabel}>Access: </Text>
-                <Text style={styles.accessValue}>Class Teacher</Text>
+                <Text style={styles.accessValue}>{examData.access}</Text>
               </Text>
             </View>
 
@@ -93,7 +132,7 @@ export default function GradeScreen() {
                   />
                 </Svg>
                 <Text style={styles.infoLabel}>Date</Text>
-                <Text style={styles.infoValue}>August 20, 2025</Text>
+                <Text style={styles.infoValue}>{examData.date}</Text>
               </View>
               <View style={styles.infoBox}>
                 <Svg width={24} height={24} viewBox="0 0 19 18" fill="none">
@@ -103,7 +142,7 @@ export default function GradeScreen() {
                   />
                 </Svg>
                 <Text style={styles.infoLabel}>Maximum Marks</Text>
-                <Text style={styles.infoValue}>100</Text>
+                <Text style={styles.infoValue}>{examData.maxMarks}</Text>
               </View>
               <View style={styles.infoBox}>
                 <Svg width={24} height={24} viewBox="0 0 21 20" fill="none">
@@ -113,7 +152,7 @@ export default function GradeScreen() {
                   />
                 </Svg>
                 <Text style={styles.infoLabel}>Duration</Text>
-                <Text style={styles.infoValue}>60 min.</Text>
+                <Text style={styles.infoValue}>{examData.duration}min.</Text>
               </View>
               <View style={styles.infoBox}>
                 <Svg width="24" height="24" viewBox="0 0 21 16" fill="none">
@@ -123,12 +162,12 @@ export default function GradeScreen() {
                   />
                 </Svg>
                 <Text style={styles.infoLabel}>Type</Text>
-                <Text style={styles.infoValue}>Final Exam</Text>
+                <Text style={styles.infoValue}>{examData.examType}</Text>
               </View>
             </View>
           </View>
 
-          <TouchableOpacity style={styles.saveBtn}>
+          <TouchableOpacity style={styles.saveBtn} onPress={saveGrades}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Svg width={18} height={20} viewBox="0 0 18 20" fill="none">
                 <Path
@@ -212,7 +251,10 @@ export default function GradeScreen() {
                 <TextInput
                   style={styles.remarkInput}
                   placeholder="Optional remark"
+                  value={student.remark || ""}
+                  onChangeText={(val) => updateRemark(student.id, val)}
                 />
+
               </View>
 
               <View style={styles.attendanceRow}>
@@ -278,7 +320,7 @@ export default function GradeScreen() {
             </View>
           ))}
 
-          <TouchableOpacity style={styles.saveBtn1}>
+          <TouchableOpacity style={styles.saveBtn1} onPress={saveGrades}>
             <Text style={styles.saveBtnText1}>Save Grades</Text>
           </TouchableOpacity>
         </ScrollView>

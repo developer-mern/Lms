@@ -11,11 +11,11 @@ const H_PADDING = 16;
 const CARD_GAP = 12;
 const cardWidth = (width - H_PADDING * 2 - CARD_GAP * (CARD_COUNT - 1)) / CARD_COUNT;
 
-export default function TeachingScreen() {
+export default function StudentScreen() {
     const navigation = useNavigation();
     const cards = [
-        { key: 'class', title: 'My Class', route: 'Class', icon: 'book-outline', type: 'MaterialCommunityIcons' },
-        { key: 'lessons', title: 'Lessons', route: 'Lessons', icon: 'menu-book', type: 'MaterialIcons' },
+        { key: 'Report', title: 'My Report', route: 'Report', icon: 'book-outline', type: 'MaterialCommunityIcons' },
+        { key: 'lessons', title: 'Lessons', route: 'Select Subject', icon: 'menu-book', type: 'MaterialIcons' },
         { key: 'exam', title: 'Exam', route: 'Exam', icon: 'clipboard-text-outline', type: 'MaterialCommunityIcons' },
     ];
 
@@ -23,9 +23,6 @@ export default function TeachingScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View>
-                <View style={styles.topLine} />
-                <Text style={styles.heading}>Teaching</Text>
-
                 <View style={styles.row}>
                     {cards.map((c) => (
                         <TouchableOpacity

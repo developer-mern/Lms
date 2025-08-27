@@ -1,26 +1,32 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useAuth } from '../../Context/authContext'; // adjust path if needed
 
-export default function MoreScreen() {
-    const { logout } = useAuth();
+export default function MoreScreen({ navigation }) {
+    const { logoutUser } = useAuth();
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { 
+                    text: 'Yes', 
+                    onPress: async () => {
+                        await logoutUser();
+                        navigation.replace('Login'); // send user to login screen
+                    } 
+                },
+            ]
+        );
+    };
 
     return (
         <View style={styles.container}>
-            {/* Rocket Icon */}
-            <MaterialIcons name="rocket-launch" size={66} color="#3B82F6" />
+            <Text style={styles.title}>Account</Text>
 
-            {/* Title */}
-            <Text style={styles.title}>Coming Soon</Text>
-
-            {/* Subtitle */}
-            <Text style={styles.subtitle}>
-                You’ll soon be able to manage and view students directly here.
-            </Text>
-
-            {/* Logout Button */}
-            <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
                 <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
         </View>
@@ -36,26 +42,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     title: {
-        fontSize: 20,
-        fontWeight: '600',
+        fontSize: 22,
+        fontWeight: '700',
         color: '#111827',
-        marginTop: 20,
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 14,
-        textAlign: 'center',
-        color: '#6B7280',
-        maxWidth: 300,
-        fontWeight: '400',
         marginBottom: 30,
     },
     logoutButton: {
         backgroundColor: '#EF4444', // red
-        paddingVertical: 12,
-        paddingHorizontal: 24,
+        paddingVertical: 14,
+        paddingHorizontal: 30,
         borderRadius: 8,
-        marginTop: 20,
     },
     logoutText: {
         color: '#fff',

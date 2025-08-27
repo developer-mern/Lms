@@ -1,56 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TextInput,
     TouchableOpacity,
     Modal,
-    StyleSheet,
     ScrollView,
+    StyleSheet
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { getMyTeacherClassesApi, uploadLessonApi } from '../api/authapi';
+import { useAuth } from '../Context/authContext';
 
 export default function UploadLesson({ visible, onClose }) {
-    const [lessonTitle, setLessonTitle] = useState(null);
+    const { token } = useAuth();
+
+    const [lessonTitle, setLessonTitle] = useState('');
     const [subject, setSubject] = useState(null);
     const [className, setClassName] = useState(null);
     const [description, setDescription] = useState('');
     const [videoFile, setVideoFile] = useState(null);
 
-    const [openLessonTitle, setOpenLessonTitle] = useState(false);
     const [openSubject, setOpenSubject] = useState(false);
     const [openClass, setOpenClass] = useState(false);
 
-    const lessonTitleItems = [
-        { label: 'Lesson 1', value: 'lesson1' },
-        { label: 'Lesson 2', value: 'lesson2' },
-        { label: 'Lesson 3', value: 'lesson3' },
-        { label: 'Lesson 4', value: 'lesson4' },
-        { label: 'Lesson 5', value: 'lesson' },
-    ];
+    const [subjectItems, setSubjectItems] = useState([]);
+    const [classItems, setClassItems] = useState([]);
 
-    const subjectItems = [
-        { label: 'Math', value: 'math' },
-        { label: 'Science', value: 'science' },
-    ];
+    const uploadLesson = async () => {
+        const data = await uploadLessonApi(token, {
+            lessonTitle,
+            subject,
+            classId: className,
+            description,
+            video: videoFile,
+        });
 
-    const classItems = [
-        { label: 'Class 5', value: 'class5' },
-        { label: 'Class 6', value: 'class6' },
-    ];
+        if (data.success) {
+            alert("Lesson uploaded successfully!");
+            onClose();
+        } else {
+            alert(data.message);
+        }
+    };
+
+    // Fetch classes and subjects from API
+    useEffect(() => {
+        const fetchClasses = async () => {
+            const classes = await getMyTeacherClassesApi(token);
+            if (classes.length > 0) {
+                const classOptions = classes.map(cls => ({
+                    label: cls.name,
+                    value: cls.id,
+                }));
+                setClassItems(classOptions);
+
+                const subjectsSet = new Set();
+                classes.forEach(cls => {
+                    cls.subjects.forEach(sub => subjectsSet.add(sub));
+                });
+                const subjectOptions = Array.from(subjectsSet).map(sub => ({
+                    label: sub,
+                    value: sub,
+                }));
+                setSubjectItems(subjectOptions);
+            }
+        };
+        fetchClasses();
+    }, [token]);
 
     const pickVideo = async () => {
         try {
-            const result = await DocumentPicker.getDocumentAsync({
-                type: 'video/*',
-            });
-
-            if (result.type === 'success') {
-                setVideoFile(result);
-                console.log('Video selected:', result);
-            }
+            const result = await DocumentPicker.getDocumentAsync({ type: 'video/*' });
+            if (result.type === 'success') setVideoFile(result);
         } catch (err) {
             console.log('Error picking video:', err);
         }
@@ -59,7 +83,6 @@ export default function UploadLesson({ visible, onClose }) {
     return (
         <Modal visible={visible} animationType="slide" transparent>
             <View style={styles.overlay}>
-
                 <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                     <AntDesign name="close" size={20} color="#000" />
                 </TouchableOpacity>
@@ -68,19 +91,17 @@ export default function UploadLesson({ visible, onClose }) {
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <Text style={styles.heading}>Upload Video Lesson</Text>
 
+                        {/* Lesson Title Input */}
                         <Text style={styles.label}>Lesson Title</Text>
-                        <DropDownPicker
-                            open={openLessonTitle}
-                            value={lessonTitle}
-                            items={lessonTitleItems}
-                            setOpen={setOpenLessonTitle}
-                            setValue={setLessonTitle}
-                            placeholder="Lesson Name"
-                            placeholderStyle={styles.placeholderText}
+                        <TextInput
                             style={styles.inputBox}
-                            dropDownContainerStyle={styles.dropdownContainer}
+                            placeholder="Lesson Name"
+                            placeholderTextColor="#6B7280"
+                            value={lessonTitle}
+                            onChangeText={setLessonTitle}
                         />
 
+                        {/* Subject Dropdown */}
                         <Text style={styles.label}>Subject</Text>
                         <DropDownPicker
                             open={openSubject}
@@ -88,12 +109,14 @@ export default function UploadLesson({ visible, onClose }) {
                             items={subjectItems}
                             setOpen={setOpenSubject}
                             setValue={setSubject}
-                            placeholder="Subject Name"
+                            placeholder="Select Subject"
                             placeholderStyle={styles.placeholderText}
                             style={styles.inputBox}
                             dropDownContainerStyle={styles.dropdownContainer}
+                            listMode="MODAL"
                         />
 
+                        {/* Class Dropdown */}
                         <Text style={styles.label}>Class</Text>
                         <DropDownPicker
                             open={openClass}
@@ -101,12 +124,14 @@ export default function UploadLesson({ visible, onClose }) {
                             items={classItems}
                             setOpen={setOpenClass}
                             setValue={setClassName}
-                            placeholder="Class Name"
+                            placeholder="Select Class"
                             placeholderStyle={styles.placeholderText}
                             style={styles.inputBox}
                             dropDownContainerStyle={styles.dropdownContainer}
+                            listMode="MODAL"
                         />
 
+                        {/* Description */}
                         <Text style={styles.label}>Description</Text>
                         <TextInput
                             style={[styles.inputBox, styles.textArea]}
@@ -118,12 +143,11 @@ export default function UploadLesson({ visible, onClose }) {
                             onChangeText={setDescription}
                         />
 
+                        {/* Video File Upload */}
                         <Text style={styles.label}>Video File</Text>
                         <TouchableOpacity style={styles.videoUpload} onPress={pickVideo}>
                             <AntDesign name="cloudupload" size={32} color="#6B7280" />
-                            <Text style={styles.mainText}>
-                                Drag & drop your video here
-                            </Text>
+                            <Text style={styles.mainText}>Drag & drop your video here</Text>
                             <Text style={styles.subText}>
                                 Or click to browse files (MP4, WebM, Ogg up to 500MB)
                             </Text>
@@ -139,7 +163,8 @@ export default function UploadLesson({ visible, onClose }) {
                             </Text>
                         )}
 
-                        <TouchableOpacity style={styles.uploadButton}>
+                        {/* Upload Button */}
+                        <TouchableOpacity style={styles.uploadButton} onPress={uploadLesson}>
                             <Text style={styles.uploadButtonText}>Upload Lesson</Text>
                         </TouchableOpacity>
                     </ScrollView>

@@ -1,36 +1,55 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useAuth } from '../../Context/authContext';
+import { login } from '../../api/authapi';
 
 export default function LoginScreen({ navigation }) {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [selectedRole, setSelectedRole] = useState('');
     const [isLoggingIn, setIsLoggingIn] = useState(false);
-    const { login, isLoading } = useAuth();
+    const { loginUser, isLoading } = useAuth();
+    const roles = ['student', 'parent', 'teacher'];
 
-    const roles = ['Student', 'Parent', 'Teacher'];
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
-            return;
-        }
-
-        if (!selectedRole) {
-            Alert.alert('Error', 'Please select your role');
+        if (!username || !password || !selectedRole) {
+            Alert.alert('Error', 'Please fill all fields and select role');
             return;
         }
 
         setIsLoggingIn(true);
-        const result = await login(email, password, selectedRole);
-        setIsLoggingIn(false);
 
-        if (result.success) {
-            Alert.alert('Success', `Welcome ${result.user.name}!`);
-            // Navigation is handled automatically by AppNavigator based on role
-        } else {
-            Alert.alert('Login Failed', result.error);
+        try {
+            const result = await login(username, password, selectedRole);
+            setIsLoggingIn(false);
+
+            if (result.token) {
+                // Save login details to context
+                loginUser(result);
+
+                Alert.alert('Success', `Welcome ${result.user.id}!`);
+
+                // Navigate based on role
+                switch (selectedRole.toLowerCase()) {
+                    case 'student':
+                        navigation.replace('StudentDashboard');
+                        break;
+                    case 'teacher':
+                        navigation.replace('TeacherDashboard');
+                        break;
+                    case 'parent':
+                        navigation.replace('ParentDashboard');
+                        break;
+                    default:
+                        navigation.replace('Home');
+                }
+            } else {
+                Alert.alert('Login Failed', result.error || 'Something went wrong');
+            }
+        } catch (error) {
+            setIsLoggingIn(false);
+            Alert.alert('Login Failed', error.message || 'Something went wrong');
         }
     };
 
@@ -48,21 +67,17 @@ export default function LoginScreen({ navigation }) {
             contentContainerStyle={styles.container}
             keyboardShouldPersistTaps="handled"
         >
-            {/* Card */}
             <View style={styles.card}>
                 <Text style={styles.title}>🔐 LMS Login</Text>
 
-                {/* Email Input */}
                 <TextInput
                     style={styles.input}
-                    placeholder="Email Address"
-                    value={email}
-                    onChangeText={setEmail}
+                    placeholder="Username"
+                    value={username}
+                    onChangeText={setUsername}
                     autoCapitalize="none"
-                    keyboardType="email-address"
                 />
 
-                {/* Password Input */}
                 <TextInput
                     style={styles.input}
                     placeholder="Password"
@@ -71,7 +86,6 @@ export default function LoginScreen({ navigation }) {
                     secureTextEntry
                 />
 
-                {/* Role Selection */}
                 <Text style={styles.roleLabel}>Select Role</Text>
                 <View style={styles.roleContainer}>
                     {roles.map((role) => (
@@ -95,14 +109,13 @@ export default function LoginScreen({ navigation }) {
                     ))}
                 </View>
 
-                {/* Login Button */}
                 <TouchableOpacity
                     style={[
                         styles.loginButton,
-                        (!email || !password || !selectedRole) && styles.loginButtonDisabled,
+                        (!username || !password || !selectedRole) && styles.loginButtonDisabled,
                     ]}
                     onPress={handleLogin}
-                    disabled={isLoggingIn || !email || !password || !selectedRole}
+                    disabled={isLoggingIn || !username || !password || !selectedRole}
                 >
                     {isLoggingIn ? (
                         <ActivityIndicator color="#fff" />
@@ -114,6 +127,7 @@ export default function LoginScreen({ navigation }) {
         </ScrollView>
     );
 }
+
 
 const styles = StyleSheet.create({
     container: {

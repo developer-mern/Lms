@@ -4,23 +4,22 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useAuth } from '../../Context/authContext';
-import { getExamsByClassApi, getMyTeacherClassesApi } from '../../api/authapi';
+import { getstudentexam } from '../../api/authapi';
 
-export default function ExamScreen() {
+export default function ExamReport() {
   const { token } = useAuth();
   const navigation = useNavigation();
 
   const [activeTab, setActiveTab] = useState("Upcoming");
-  const [classesTeacher, setTeacherClasses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedClass, setSelectedClass] = useState("all");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [exams, setExams] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+
   const tabs = ["Upcoming", "Today", "Past", "All"];
 
-  // Filter exams based on search, class, subject, and tab
   const getFilteredExams = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -30,25 +29,36 @@ export default function ExamScreen() {
         const examDate = new Date(exam.examDate);
         examDate.setHours(0, 0, 0, 0);
 
-        if (searchQuery && !exam.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+        // Filter by search query
+        if (searchQuery && !exam.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+          return false;
+        }
 
+        // Filter by selected class
         if (selectedClass && selectedClass !== "all") {
-          const examClassId = exam.grade?.id || exam.classId;
-          if (examClassId != selectedClass) return false;
+          const examClassId = exam.grade?.id;
+          if (examClassId != selectedClass) {
+            return false;
+          }
         }
 
+        // Filter by selected subject
         if (selectedSubject && selectedSubject !== "all") {
-          const examSubject = typeof exam.subject === "string" ? exam.subject : exam.subject?.name;
-          if (!examSubject || examSubject.toLowerCase() !== selectedSubject.toLowerCase()) return false;
+          const examSubject = exam.subject?.name;
+          if (!examSubject || examSubject.toLowerCase() !== selectedSubject.toLowerCase()) {
+            return false;
+          }
         }
 
+        // Filter by active tab
         if (activeTab === "Upcoming") return examDate > today && exam.status !== "CANCELLED";
         if (activeTab === "Today") return examDate.getTime() === today.getTime() && exam.status !== "CANCELLED";
         if (activeTab === "Past") return examDate < today || exam.status === "CANCELLED";
-        return true;
+        return true; // "All"
       })
       .map(exam => {
-        let statusColor = "#4CAF50"; 
+        // Map to display format
+        let statusColor = "#4CAF50"; // Default green
         if (exam.status === "SCHEDULED") statusColor = "#FFC107";
         else if (exam.status === "PUBLISHED") statusColor = "#2196F3";
         else if (exam.status === "CANCELLED") statusColor = "#F44336";
@@ -57,7 +67,7 @@ export default function ExamScreen() {
         return {
           ...exam,
           grade: exam.grade?.name || "",
-          subject: typeof exam.subject === "string" ? exam.subject : exam.subject?.name || "",
+          subject: exam.subject?.name || "",
           date: new Date(exam.examDate).toLocaleDateString("en-US", {
             day: "numeric",
             month: "long",
@@ -71,21 +81,19 @@ export default function ExamScreen() {
   };
 
   useEffect(() => {
-    if (selectedClass && selectedClass !== "all") fetchExams(selectedClass);
-    else if (selectedClass === "all") fetchAllExams();
-  }, [selectedClass]);
-
-  useEffect(() => {
-    fetchMyTeacherClasses();
+    fetchAllExams();
   }, [token]);
 
-  const fetchExams = async (classId) => {
-    if (!classId || classId === "all") return;
-
+  const fetchAllExams = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const data = await getExamsByClassApi(classId, token);
-      setExams(data || []);
+      const response = await getstudentexam(token);
+      if (response && response.success && Array.isArray(response.exams)) {
+        setExams(response.exams);
+      } else {
+        setExams([]);
+      }
     } catch (err) {
       console.error("Error fetching exams:", err);
       setError("Failed to load exams");
@@ -95,50 +103,40 @@ export default function ExamScreen() {
     }
   };
 
-  const fetchAllExams = async () => {
-    if (classesTeacher.length === 0) return;
-    setLoading(true);
-    try {
-      const allExamsPromises = classesTeacher.map(cls =>
-        getExamsByClassApi(cls.id, token).catch(() => [])
+  // Extract unique classes from exam data
+  const getUniqueClasses = () => {
+    const classes = exams
+      .map(exam => exam.grade)
+      .filter((grade, index, array) => 
+        grade && array.findIndex(g => g?.id === grade.id) === index
       );
-      const allExamsArrays = await Promise.all(allExamsPromises);
-      setExams(allExamsArrays.flat());
-    } catch (err) {
-      console.error("Error fetching all exams:", err);
-      setError("Failed to load exams");
-      setExams([]);
-    } finally {
-      setLoading(false);
-    }
+    return classes;
   };
 
-  const fetchMyTeacherClasses = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const classesData = await getMyTeacherClassesApi(token);
-      setTeacherClasses(classesData || []);
-    } catch (err) {
-      console.error("Error fetching teacher classes:", err);
-      setError("Failed to load classes");
-      setTeacherClasses([]);
-    } finally {
-      setLoading(false);
-    }
+  // Extract unique subjects from exam data
+  const getUniqueSubjects = () => {
+    const subjects = exams
+      .map(exam => exam.subject)
+      .filter((subject, index, array) => 
+        subject && array.findIndex(s => s?.id === subject.id) === index
+      );
+    return subjects;
   };
 
   const classOptions = [
     { label: "All Classes", value: "all" },
-    ...classesTeacher.map(cls => ({ label: `${cls.name} (${cls.gradeName})`, value: cls.id }))
+    ...getUniqueClasses().map(cls => ({
+      label: cls.name,
+      value: cls.id
+    }))
   ];
-
-  const allSubjects = classesTeacher.flatMap(cls => cls.subjects || [])
-    .filter((subject, index, array) => array.indexOf(subject) === index);
 
   const subjectOptions = [
     { label: "All Subjects", value: "all" },
-    ...allSubjects.map(subj => ({ label: subj, value: subj.toLowerCase() }))
+    ...getUniqueSubjects().map(subj => ({
+      label: subj.name,
+      value: subj.name.toLowerCase()
+    }))
   ];
 
   const displayedExams = getFilteredExams();
@@ -151,7 +149,7 @@ export default function ExamScreen() {
           style={styles.retryButton}
           onPress={() => {
             setError(null);
-            fetchMyTeacherClasses();
+            fetchAllExams();
           }}
         >
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -163,7 +161,7 @@ export default function ExamScreen() {
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <View style={styles.container}>
-        {/* Search */}
+        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Icon name="search" size={24} color="#999" />
           <TextInput
@@ -175,7 +173,7 @@ export default function ExamScreen() {
           />
         </View>
 
-        {/* Class & Subject */}
+        {/* Class & Subject Dropdowns */}
         <View style={styles.row}>
           <View style={styles.dropdownContainer}>
             <Text style={styles.label}>Class</Text>
@@ -208,24 +206,43 @@ export default function ExamScreen() {
           </View>
         </View>
 
-        {/* Tabs */}
+        {/* Tab Navigation */}
         <View style={styles.container1}>
           {tabs.map((tab, index) => (
             <React.Fragment key={tab}>
-              {index > 0 && !(activeTab === tab || tabs[index - 1] === activeTab) && (
-                <View style={styles.separator} />
-              )}
+              {/* Left separator */}
+              {index > 0 && !(
+                (activeTab === tab) ||
+                (tabs[index - 1] === activeTab)
+              ) && (
+                  <View style={styles.separator} />
+                )}
+
+              {/* Tab Button */}
               <TouchableOpacity
-                style={[styles.tabButton, activeTab === tab && styles.activeTab]}
+                style={[
+                  styles.tabButton,
+                  activeTab === tab && styles.activeTab
+                ]}
                 onPress={() => setActiveTab(tab)}
               >
-                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                <Text
+                  style={[
+                    styles.tabText,
+                    activeTab === tab && styles.activeTabText
+                  ]}
+                >
                   {tab}
                 </Text>
               </TouchableOpacity>
-              {index < tabs.length - 1 && !(activeTab === tab || tabs[index + 1] === activeTab) && (
-                <View style={styles.separator} />
-              )}
+
+              {/* Right separator */}
+              {index < tabs.length - 1 && !(
+                (activeTab === tab) ||
+                (tabs[index + 1] === activeTab)
+              ) && (
+                  <View style={styles.separator} />
+                )}
             </React.Fragment>
           ))}
         </View>
@@ -239,7 +256,7 @@ export default function ExamScreen() {
           {!loading && displayedExams.map((exam, idx) => (
             <View key={`${exam.id || idx}-${idx}`} style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.examTitle}>{exam.title}</Text>
+                <Text style={styles.examTitle}>{exam.examType}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: `${exam.statusColor}20` }]}>
                   <Text style={[styles.statusText, { color: exam.statusColor }]}>
                     {exam.status}
@@ -253,10 +270,7 @@ export default function ExamScreen() {
               </View>
 
               <View style={styles.metaRow1}>
-                <View style={styles.metacol}>
-                  <Text style={styles.access}>Access:</Text>
-                  <Text style={styles.classteacher}>{exam.access}</Text>
-                </View>
+               
                 <View style={styles.metacol}>
                   <Text style={styles.access}>Grade:</Text>
                   <Text style={styles.classteacher}>{exam.grade}</Text>
@@ -265,33 +279,13 @@ export default function ExamScreen() {
                   <Text style={styles.access}>Subject:</Text>
                   <Text style={styles.classteacher}>{exam.subject}</Text>
                 </View>
+                 <View style={styles.metacol}>
+                  <Text style={styles.access}>Duration:</Text>
+                  <Text style={styles.classteacher}>{exam.duration}</Text>
+                </View>
               </View>
 
-              <View style={styles.buttonRow}>
-                {exam.buttons.map((btn, i) => {
-                  const isDisabled = (btn === "Grade" && (exam.status === "SCHEDULED" || exam.status === "ONGOING"));
-                  return (
-                    <TouchableOpacity
-                      key={`${btn}-${i}`}
-                      style={[styles.button, isDisabled && styles.buttonDisabled]}
-                      onPress={() => {
-                        if (isDisabled) return;
-                        navigation.navigate('GradeScreen', { examData: exam });
-                      }}
-                      disabled={isDisabled}
-                    >
-                      <Icon
-                        name="grading"
-                        size={18}
-                        color={isDisabled ? "#ddd" : "#1976D2"}
-                      />
-                      <Text style={[styles.buttonText, isDisabled && styles.buttonTextDisabled]}>
-                        {btn}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+             
             </View>
           ))}
 
@@ -303,7 +297,6 @@ export default function ExamScreen() {
     </ScrollView>
   );
 }
-
 
 const styles = StyleSheet.create({
   container: {

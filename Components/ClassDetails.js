@@ -6,14 +6,14 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
+  SafeAreaView,FlatList
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from "@expo/vector-icons";
 import Svg, { Mask, Rect, G, Path } from "react-native-svg";
 
 export default function ClassDetailsPopup({ visible, onClose, classData }) {
-
+  if (!visible || !classData) return null;
   return (
     <Modal
       visible={visible}
@@ -44,7 +44,7 @@ export default function ClassDetailsPopup({ visible, onClose, classData }) {
 
               <View >
                 <Text style={styles.title}>Class Details</Text>
-                <Text style={styles.subtitle}>Information about X-A</Text>
+                <Text style={styles.subtitle}>Information about {classData.name}</Text>
               </View>
             </View>
 
@@ -52,11 +52,11 @@ export default function ClassDetailsPopup({ visible, onClose, classData }) {
             <View style={styles.row}>
               <View style={styles.infoBlock1}>
                 <Text style={styles.label}>Class Name</Text>
-                <Text style={styles.value}>X-A</Text>
+                <Text style={styles.value}>{classData.name}</Text>
               </View>
               <View style={styles.infoBlock}>
                 <Text style={styles.label}>Grade</Text>
-                <Text style={styles.value}>Grade II</Text>
+                <Text style={styles.value}>{classData.gradeName} </Text>
               </View>
             </View>
 
@@ -74,11 +74,17 @@ export default function ClassDetailsPopup({ visible, onClose, classData }) {
             <View style={styles.section}>
               <Text style={styles.label}>Available Subjects</Text>
               <View style={styles.tagContainer}>
-                {["Maths", "Science", "English"].map((subject, idx) => (
-                  <View key={idx} style={styles.tagGrey}>
-                    <Text style={styles.tagGreyText}>{subject}</Text>
-                  </View>
-                ))}
+                {classData.subjects?.length > 0 ? (
+                  <FlatList
+                    data={classData.subjects}
+                    keyExtractor={(item, index) => index.toString()}
+                    renderItem={({ item }) => (
+                      <Text>• {item?.name || item}</Text>
+                    )}
+                  />
+                ) : (
+                  <Text>No subjects assigned</Text>
+                )}
               </View>
             </View>
 
@@ -106,7 +112,7 @@ export default function ClassDetailsPopup({ visible, onClose, classData }) {
               <Text style={styles.studentText}>
                 Students Enrolled:{" "}
                 <Text style={{ fontWeight: 500, fontSize: 16, color: "#111827" }}>
-                  40
+                  {classData.studentCount}
                 </Text>
               </Text>
             </View>

@@ -9,7 +9,7 @@ const StudentBottomnavbar = ({ state, navigation }) => {
         { id: 'Home', label: 'Home', icon: 'home' },
         { id: 'Timetable', label: 'Timetable', icon: 'event-note' },
 
-        { id: 'academic', label: 'Academic', icon: 'import-contacts' },
+        { id: 'Academic', label: 'Academic', icon: 'import-contacts' },
 
         { id: 'Chat', label: 'Chat', icon: 'chat-bubble-outline' },
 

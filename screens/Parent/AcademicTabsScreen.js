@@ -11,43 +11,40 @@ const H_PADDING = 16;
 const CARD_GAP = 12;
 const cardWidth = (width - H_PADDING * 2 - CARD_GAP * (CARD_COUNT - 1)) / CARD_COUNT;
 
-export default function TeachingScreen() {
+export default function AcademicTabsScreen() {
     const navigation = useNavigation();
     const cards = [
-        { key: 'class', title: 'My Class', route: 'Class', icon: 'book-outline', type: 'MaterialCommunityIcons' },
-        { key: 'lessons', title: 'Lessons', route: 'Lessons', icon: 'menu-book', type: 'MaterialIcons' },
-        { key: 'exam', title: 'Exam', route: 'Exam', icon: 'clipboard-text-outline', type: 'MaterialCommunityIcons' },
+        { key: 'attendance', title: 'Attendance', route: 'Attendance Tracking', icon: 'book-outline', type: 'MaterialCommunityIcons' },
+        { key: 'teacher', title: 'Teacher', route: 'Teacher Screen', icon: 'menu-book', type: 'MaterialIcons' },
+        { key: 'exam', title: 'Fee', route: 'Fees', icon: 'clipboard-text-outline', type: 'MaterialCommunityIcons' },
     ];
 
 
     return (
         <SafeAreaView style={styles.container}>
-        <View>
-            <View style={styles.topLine} />
-            <Text style={styles.heading}>Teaching</Text>
+            <View>
+                <View style={styles.row}>
+                    {cards.map((c) => (
+                        <TouchableOpacity
+                            key={c.key}
+                            style={[styles.card, { width: cardWidth }]}
+                            onPress={() => navigation.navigate(c.route)}
+                            activeOpacity={0.8}
+                        >
+                            <View style={styles.iconWrap}>
+                                {c.type === 'MaterialIcons' ? (
+                                    <MaterialIcons name={c.icon} size={28} style={styles.icon} />
+                                ) : (
+                                    <MaterialCommunityIcons name={c.icon} size={28} style={styles.icon} />
+                                )}
+                            </View>
+                            <Text style={styles.cardText}>{c.title}</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
 
-            <View style={styles.row}>
-                {cards.map((c) => (
-                    <TouchableOpacity
-                        key={c.key}
-                        style={[styles.card, { width: cardWidth }]}
-                        onPress={() => navigation.navigate(c.route)}
-                        activeOpacity={0.8}
-                    >
-                        <View style={styles.iconWrap}>
-                            {c.type === 'MaterialIcons' ? (
-                                <MaterialIcons name={c.icon} size={28} style={styles.icon} />
-                            ) : (
-                                <MaterialCommunityIcons name={c.icon} size={28} style={styles.icon} />
-                            )}
-                        </View>
-                        <Text style={styles.cardText}>{c.title}</Text>
-                    </TouchableOpacity>
-                ))}
+                <View style={{ flex: 1 }} />
             </View>
-
-            <View style={{ flex: 1 }} />
-        </View>
         </SafeAreaView>
     );
 }

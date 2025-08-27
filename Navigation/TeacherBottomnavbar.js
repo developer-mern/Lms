@@ -9,7 +9,7 @@ const TeacherBottomnavbar = ({ state, navigation }) => {
         { id: 'Home', label: 'Home', icon: 'home' },
         { id: 'Timetable', label: 'Timetable', icon: 'event-note' },
 
-        { id: 'teaching', label: 'Teaching', icon: 'import-contacts' },
+        { id: 'Teaching', label: 'Teaching', icon: 'import-contacts' },
 
         { id: 'Chat', label: 'Chat', icon: 'chat-bubble-outline' },
 
